@@ -8,9 +8,11 @@ echo "Installing package dependencies..."
 echo "---------------------------------------------------------------"
 # pacman -Syu --noconfirm PACKAGESHERE
 
-echo "Installing debloated packages..."
-echo "---------------------------------------------------------------"
-get-debloated-pkgs --add-common --prefer-nano
+# debloated packages only ship for x86_64 and aarch64,
+# disabled while the ported arches build from stock pacman packages
+#echo "Installing debloated packages..."
+#echo "---------------------------------------------------------------"
+#get-debloated-pkgs --add-common --prefer-nano
 
 # Comment this out if you need an AUR package
 #make-aur-package PACKAGENAME
