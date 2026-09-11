@@ -18,18 +18,14 @@ jobs:
     strategy:
       matrix:
         include:
-          - runs-on: ubuntu-latest
-            name: Build AppImage
-            arch: x86_64
-          # comment out these 3 lines if aarch64 is not wanted
-          - runs-on: ubuntu-24.04-arm
-            name: Build AppImage
-            arch: aarch64
+          - { runs-on: ubuntu-latest, name: Build AppImage, arch: x86_64 }
+          # comment out this line if aarch64 is not wanted
+          - { runs-on: ubuntu-24.04-arm, name: Build AppImage, arch: aarch64 }
     container: ghcr.io/pkgforge-dev/archlinux:latest
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       - name: Preparing Container
-        uses: pkgforge-dev/anylinux-setup-action@0964f2258d6c93d1391359978dde081fd8b3c6af # v2
+        uses: pkgforge-dev/anylinux-setup-action@7278cbb7c3692fce7241d427614ef7984192f138 # v3
       - name: Install Dependencies
         run: DEVEL_RELEASE=1 /bin/sh ./get-dependencies.sh
       - name: Make AppImage
@@ -40,9 +36,44 @@ jobs:
           name: AppImage-${{ matrix.arch }}
           path: dist
 
+  # riscv64, loongarch64, ppc64le and ppc64 have no native runners, they build
+  # in the same container under qemu user emulation. comment out a line in the
+  # matrix to drop one arch, or set `if:` to false to turn the whole job off
+  build-additional-cpu-arches:
+    if: true
+    name: "${{ matrix.name }} (${{ matrix.arch }})"
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { name: Build AppImage, arch: riscv64, platform: linux/riscv64 }
+          - { name: Build AppImage, arch: loongarch64, platform: linux/loong64 }
+          - { name: Build AppImage, arch: ppc64le, platform: linux/ppc64le }
+          # powerpc64 is big endian, uname -m reports ppc64
+          - { name: Build AppImage, arch: ppc64, platform: linux/ppc64 }
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Build AppImage (emulated)
+        uses: pkgforge-dev/anylinux-setup-action/emulated@7278cbb7c3692fce7241d427614ef7984192f138 # v3
+        with:
+          platform: ${{ matrix.platform }}
+        env:
+          DEVEL_RELEASE: 1
+      - name: Upload artifact
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        with:
+          name: AppImage-${{ matrix.arch }}
+          path: dist
+
   release:
-    if: ${{ github.ref_name == 'main' }}
-    needs: [build]
+    # !cancelled() is what lets the release still happen when the job above is
+    # switched off, a skipped dependency otherwise skips this job too
+    if: >-
+      ${{ !cancelled() && github.ref_name == 'main'
+      && needs.build.result == 'success'
+      && needs.build-additional-cpu-arches.result != 'failure' }}
+    needs: [build, build-additional-cpu-arches]
     permissions: write-all
     runs-on: ubuntu-latest
     steps:
