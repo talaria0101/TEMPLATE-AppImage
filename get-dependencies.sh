@@ -24,3 +24,6 @@ get-debloated-pkgs --add-common --prefer-nano
 # else
 # 	regular build steps
 # fi
+
+# Note that when building manually, you want to output the version of the
+# application to a ~/version file and remove VERSION from make-appimage.sh
